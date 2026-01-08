@@ -46,28 +46,65 @@ function updateSpeakingStatus(mode) {
     console.log('Speaking status updated:', { mode, isSpeaking }); // Debug log
 }
 
+function addMessage(text, source) {
+    const messagesContainer = document.getElementById('messages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${source}`;
+    
+    const metaDiv = document.createElement('div');
+    metaDiv.className = 'message-meta';
+    metaDiv.textContent = source === 'user' ? 'You' : 'Agent';
+    
+    const textDiv = document.createElement('div');
+    textDiv.textContent = text;
+    
+    messageDiv.appendChild(metaDiv);
+    messageDiv.appendChild(textDiv);
+    messagesContainer.appendChild(messageDiv);
+    
+    // Scroll to bottom
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function clearMessages() {
+    const messagesContainer = document.getElementById('messages');
+    messagesContainer.innerHTML = '';
+}
+
 async function startConversation() {
     const startButton = document.getElementById('startButton');
     const endButton = document.getElementById('endButton');
     
     try {
-        const hasPermission = await requestMicrophonePermission();
-        if (!hasPermission) {
-            alert('Microphone permission is required for the conversation.');
-            return;
-        }
+        // const hasPermission = await requestMicrophonePermission();
+        // if (!hasPermission) {
+        //     alert('Microphone permission is required for the conversation.');
+        //     return;
+        // }
 
-        const signedUrl = await getSignedUrl();
-        //const agentId = await getAgentId(); // You can switch to agentID for public agents
+        //const signedUrl = await getSignedUrl();
+        const agentId = await getAgentId(); // You can switch to agentID for public agents
         
         conversation = await Conversation.startSession({
-            signedUrl: signedUrl,
-            //agentId: agentId, // You can switch to agentID for public agents
+            //signedUrl: signedUrl,
+            connectionType: 'webrtc',
+            agentId: agentId, // You can switch to agentID for public agents
+            overrides: {
+                conversation: {
+                    textOnly: true,
+                }
+            },
             onConnect: () => {
                 console.log('Connected');
                 updateStatus(true);
                 startButton.disabled = true;
                 endButton.disabled = false;
+                // Enable message input
+                const messageInput = document.getElementById('messageInput');
+                const sendButton = document.getElementById('sendButton');
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                clearMessages();
             },
             onDisconnect: () => {
                 console.log('Disconnected');
@@ -75,6 +112,11 @@ async function startConversation() {
                 startButton.disabled = false;
                 endButton.disabled = true;
                 updateSpeakingStatus({ mode: 'listening' }); // Reset to listening mode on disconnect
+                // Disable message input
+                const messageInput = document.getElementById('messageInput');
+                const sendButton = document.getElementById('sendButton');
+                messageInput.disabled = true;
+                sendButton.disabled = true;
             },
             onError: (error) => {
                 console.error('Conversation error:', error);
@@ -83,6 +125,56 @@ async function startConversation() {
             onModeChange: (mode) => {
                 console.log('Mode changed:', mode); // Debug log to see exact mode object
                 updateSpeakingStatus(mode);
+            },
+            onMessage: (message) => {
+                console.log('Message received:', message);
+                
+                // Handle different message types
+                if (message.type === 'conversation_initiation_metadata') {
+                    // Initial conversation metadata - skip displaying
+                    return;
+                }
+                
+                // Extract text from message
+                let messageText = '';
+                let source = 'agent';
+                
+                // Handle different message formats
+                if (typeof message === 'string') {
+                    // Simple string message
+                    messageText = message;
+                    source = 'agent';
+                } else if (message.type === 'response_audio_transcript' || message.type === 'response_text') {
+                    messageText = message.text || message.transcript || message.content || '';
+                    source = 'agent';
+                } else if (message.type === 'user_transcript' || message.type === 'user_message') {
+                    messageText = message.text || message.transcript || message.content || '';
+                    source = 'user';
+                } else if (message.text) {
+                    messageText = message.text;
+                    source = message.role === 'user' ? 'user' : 'agent';
+                } else if (message.transcript) {
+                    messageText = message.transcript;
+                    source = message.role === 'user' ? 'user' : 'agent';
+                } else if (message.content) {
+                    messageText = message.content;
+                    source = message.role === 'user' ? 'user' : 'agent';
+                } else if (message.message) {
+                    messageText = message.message;
+                    source = message.role === 'user' ? 'user' : 'agent';
+                } else {
+                    // Fallback: try to extract any text content or stringify
+                    const stringified = JSON.stringify(message);
+                    // Only show if it's not just metadata
+                    if (stringified.length < 200 && !stringified.includes('conversation_initiation')) {
+                        messageText = stringified;
+                    }
+                }
+                
+                // Only add message if we have meaningful text
+                if (messageText && messageText.trim()) {
+                    addMessage(messageText.trim(), source);
+                }
             }
         });
     } catch (error) {
@@ -98,8 +190,43 @@ async function endConversation() {
     }
 }
 
+function sendMessage() {
+    const messageInput = document.getElementById('messageInput');
+    const message = messageInput.value.trim();
+    
+    if (!message || !conversation) {
+        return;
+    }
+    
+    // Clear input immediately for better UX
+    messageInput.value = '';
+    
+    // Send message to conversation
+    try {
+        conversation.sendUserMessage(message);
+        addMessage(message, 'user');
+        // Note: User message will be displayed via onMessage callback to avoid duplicates
+    } catch (error) {
+        console.error('Error sending message:', error);
+        alert('Failed to send message. Please try again.');
+    }
+}
+
 document.getElementById('startButton').addEventListener('click', startConversation);
 document.getElementById('endButton').addEventListener('click', endConversation);
+
+// Message input handlers
+const messageInput = document.getElementById('messageInput');
+const sendButton = document.getElementById('sendButton');
+
+sendButton.addEventListener('click', sendMessage);
+
+messageInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
 
 window.addEventListener('error', function(event) {
     console.error('Global error:', event.error);
