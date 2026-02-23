@@ -87,13 +87,10 @@ async function startConversation() {
         
         conversation = await Conversation.startSession({
             //signedUrl: signedUrl,
-            connectionType: 'webrtc',
-            agentId: agentId, // You can switch to agentID for public agents
-            overrides: {
-                conversation: {
-                    textOnly: true,
-                }
-            },
+            //agentId: agentId, 
+            textOnly: true,
+            connectionType: 'websocket',
+            signedUrl: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoidXNlcl9hZ2VudF8yODAxa2VleGM5bndla3ZydHF3YWpoZXpwbWM0X2NvbnZfNjIwMWtqNTlzdGI1ZXdrYmJ6cTF6ZjRhM2hhciIsIm1ldGFkYXRhIjoie1wiYXBwbHlfZGV2X2Rpc2NvdW50XCI6IGZhbHNlLCBcInNpZ25lZF91cmxcIjogbnVsbCwgXCJzb3VyY2VcIjogbnVsbCwgXCJ2ZXJzaW9uXCI6IG51bGwsIFwiYnJhbmNoX2lkXCI6IFwiXCJ9IiwidmlkZW8iOnsicm9vbUpvaW4iOnRydWUsInJvb20iOiJyb29tX2FnZW50XzI4MDFrZWV4Yzlud2VrdnJ0cXdhamhlenBtYzRfY29udl82MjAxa2o1OXN0YjVld2tiYnpxMXpmNGEzaGFyIiwiY2FuUHVibGlzaCI6dHJ1ZSwiY2FuU3Vic2NyaWJlIjp0cnVlLCJjYW5QdWJsaXNoRGF0YSI6dHJ1ZX0sInN1YiI6InVzZXJfYWdlbnRfMjgwMWtlZXhjOW53ZWt2cnRxd2FqaGV6cG1jNF9jb252XzYyMDFrajU5c3RiNWV3a2JienExemY0YTNoYXIiLCJpc3MiOiJBUElLZXlFeHRlcm5hbCIsIm5iZiI6MTc3MTg1MjA2NSwiZXhwIjoxNzcxODUyOTY1fQ.It77azfZCg3BHTRsYpYMsJvf3xcPyPeCfgQHbb-ORWw',
             onConnect: () => {
                 console.log('Connected');
                 updateStatus(true);
